@@ -35,13 +35,13 @@
 #include <backend/gpu/mali_kbase_instr_defs.h>
 #include <mali_kbase_pm.h>
 #include <mali_kbase_gpuprops_types.h>
-#include <mali_kbase_hwcnt_watchdog_if.h>
+#include <hwcnt/mali_kbase_hwcnt_watchdog_if.h>
 
 #if MALI_USE_CSF
-#include <mali_kbase_hwcnt_backend_csf.h>
+#include <hwcnt/backend/mali_kbase_hwcnt_backend_csf.h>
 #else
-#include <mali_kbase_hwcnt_backend_jm.h>
-#include <mali_kbase_hwcnt_backend_jm_watchdog.h>
+#include <hwcnt/backend/mali_kbase_hwcnt_backend_jm.h>
+#include <hwcnt/backend/mali_kbase_hwcnt_backend_jm_watchdog.h>
 #endif
 
 #include <protected_mode_switcher.h>
@@ -53,11 +53,7 @@
 #include <linux/sizes.h>
 
 
-#if defined(CONFIG_SYNC)
-#include <sync.h>
-#else
 #include "mali_kbase_fence_defs.h"
-#endif
 
 #if IS_ENABLED(CONFIG_DEBUG_FS)
 #include <linux/debugfs.h>
@@ -555,7 +551,7 @@ struct kbase_devfreq_opp {
  * @entry_set_pte:    program the pte to be a valid entry to encode the physical
  *                    address of the next lower level page table and also update
  *                    the number of valid entries.
- * @entries_invalidate: clear out or invalidate a range of ptes.
+ * @entry_invalidate: clear out or invalidate the pte.
  * @get_num_valid_entries: returns the number of valid entries for a specific pgd.
  * @set_num_valid_entries: sets the number of valid entries for a specific pgd
  * @flags:            bitmask of MMU mode flags. Refer to KBASE_MMU_MODE_ constants.
@@ -573,7 +569,7 @@ struct kbase_mmu_mode {
 	void (*entry_set_ate)(u64 *entry, struct tagged_addr phy,
 			unsigned long flags, int level);
 	void (*entry_set_pte)(u64 *entry, phys_addr_t phy);
-	void (*entries_invalidate)(u64 *entry, u32 count);
+	void (*entry_invalidate)(u64 *entry);
 	unsigned int (*get_num_valid_entries)(u64 *pgd);
 	void (*set_num_valid_entries)(u64 *pgd,
 				      unsigned int num_of_valid_entries);
@@ -1905,15 +1901,17 @@ struct kbasep_gwt_list_element {
  *                                 to a @kbase_context.
  * @ext_res_node:                  List head for adding the metadata to a
  *                                 @kbase_context.
- * @reg:                           External resource information, containing
- *                                 the corresponding VA region
+ * @alloc:                         The physical memory allocation structure
+ *                                 which is mapped.
+ * @gpu_addr:                      The GPU virtual address the resource is
+ *                                 mapped to.
  * @ref:                           Reference count.
  *
  * External resources can be mapped into multiple contexts as well as the same
  * context multiple times.
- * As kbase_va_region is refcounted, we guarantee that it will be available
- * for the duration of the external resource, meaning it is sufficient to use
- * it to rederive any additional data, like the GPU address.
+ * As kbase_va_region itself isn't refcounted we can't attach our extra
+ * information to it as it could be removed under our feet leaving external
+ * resources pinned.
  * This metadata structure binds a single external resource to a single
  * context, ensuring that per context mapping is tracked separately so it can
  * be overridden when needed and abuses by the application (freeing the resource
@@ -1921,7 +1919,8 @@ struct kbasep_gwt_list_element {
  */
 struct kbase_ctx_ext_res_meta {
 	struct list_head ext_res_node;
-	struct kbase_va_region *reg;
+	struct kbase_mem_phy_alloc *alloc;
+	u64 gpu_addr;
 	u32 ref;
 };
 

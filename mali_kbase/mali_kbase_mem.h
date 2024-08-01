@@ -1311,7 +1311,6 @@ void kbase_mmu_disable_as(struct kbase_device *kbdev, int as_nr);
 
 void kbase_mmu_interrupt(struct kbase_device *kbdev, u32 irq_stat);
 
-#if defined(CONFIG_MALI_VECTOR_DUMP)
 /**
  * kbase_mmu_dump() - Dump the MMU tables to a buffer.
  *
@@ -1331,7 +1330,6 @@ void kbase_mmu_interrupt(struct kbase_device *kbdev, u32 irq_stat);
  * (including if the @c nr_pages is too small)
  */
 void *kbase_mmu_dump(struct kbase_context *kctx, int nr_pages);
-#endif
 
 /**
  * kbase_sync_now - Perform cache maintenance on a memory region
@@ -1870,36 +1868,28 @@ bool kbase_has_exec_va_zone(struct kbase_context *kctx);
 /**
  * kbase_map_external_resource - Map an external resource to the GPU.
  * @kctx:              kbase context.
- * @reg:               External resource to map.
+ * @reg:               The region to map.
  * @locked_mm:         The mm_struct which has been locked for this operation.
  *
- * On successful mapping, the VA region and the gpu_alloc refcounts will be
- * increased, making it safe to use and store both values directly.
- *
- * Return: Zero on success, or negative error code.
+ * Return: The physical allocation which backs the region on success or NULL
+ * on failure.
  */
-int kbase_map_external_resource(struct kbase_context *kctx, struct kbase_va_region *reg,
-				struct mm_struct *locked_mm);
+struct kbase_mem_phy_alloc *kbase_map_external_resource(
+		struct kbase_context *kctx, struct kbase_va_region *reg,
+		struct mm_struct *locked_mm);
 
 /**
  * kbase_unmap_external_resource - Unmap an external resource from the GPU.
  * @kctx:  kbase context.
- * @reg:   VA region corresponding to external resource
- *
- * On successful unmapping, the VA region and the gpu_alloc refcounts will
- * be decreased. If the refcount reaches zero, both @reg and the corresponding
- * allocation may be freed, so using them after returning from this function
- * requires the caller to explicitly check their state.
+ * @reg:   The region to unmap or NULL if it has already been released.
+ * @alloc: The physical allocation being unmapped.
  */
-void kbase_unmap_external_resource(struct kbase_context *kctx, struct kbase_va_region *reg);
+void kbase_unmap_external_resource(struct kbase_context *kctx,
+		struct kbase_va_region *reg, struct kbase_mem_phy_alloc *alloc);
 
 /**
  * kbase_unpin_user_buf_page - Unpin a page of a user buffer.
  * @page: page to unpin
- *
- * The caller must have ensured that there are no CPU mappings for @page (as
- * might be created from the struct kbase_mem_phy_alloc that tracks @page), and
- * that userspace will not be able to recreate the CPU mappings again.
  */
 void kbase_unpin_user_buf_page(struct page *page);
 
